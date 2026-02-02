@@ -1,4 +1,8 @@
-define(['pipAPI', 'https://cdn.jsdelivr.net/gh/你的用户名/你的仓库名/qstiat6-mobile.js'], function (APIConstructor, stiatExtension) {
+define([
+    'pipAPI',
+   
+    'https://cdn.jsdelivr.net/gh/Privatealligator/Jacky-problem1@main/qstiat6-mobile.js'
+], function (APIConstructor, stiatExtension) {
     var API = new APIConstructor();
 
     var healthInstitutionsAllCN = [
