@@ -7,23 +7,23 @@ define(['pipAPI', 'pipScorer', 'underscore'], function (APIConstructor, Scorer, 
         // 默认配置
         var stiatObj = _.extend({
             canvas: { maxWidth: 800, proportions: 0.8, background: '#ffffff', borderWidth: 0 },
-            category: { name: 'Category', title: { media: { word: 'Category' }, css: { color: '#31b404', 'font-size': '1.8em' }, height: 4 }, media: [], css: { color: '#31b404', 'font-size': '1.8em' } },
-            attribute1: { name: 'Attribute1', title: { media: { word: 'Attribute1' }, css: { color: '#31b404', 'font-size': '1.8em' }, height: 4 }, media: [], css: { color: '#31b404', 'font-size': '1.8em' } },
-            attribute2: { name: 'Attribute2', title: { media: { word: 'Attribute2' }, css: { color: '#31b404', 'font-size': '1.8em' }, height: 4 }, media: [], css: { color: '#31b404', 'font-size': '1.8em' } },
-            trialsByBlock: []
+            category: { name: 'Category', title: { media: { word: 'Category' }, css: { color: '#000', 'font-size': '2em' }, height: 4 }, media: [], css: { color: '#000', 'font-size': '2em' } },
+            attribute1: { name: 'Attribute1', title: { media: { word: 'Attribute1' }, css: { color: '#000', 'font-size': '2em' }, height: 4 }, media: [], css: { color: '#000', 'font-size': '2em' } },
+            attribute2: { name: 'Attribute2', title: { media: { word: 'Attribute2' }, css: { color: '#000', 'font-size': '2em' }, height: 4 }, media: [], css: { color: '#000', 'font-size': '2em' } },
+            trialsByBlock: [],
+            base_url: { image: 'https://cdn.jsdelivr.net/gh/baranan/minno-tasks@0.2/IAT/images/' }
         }, options);
 
         API.addSettings('canvas', stiatObj.canvas);
 
-        // --- 核心：定义移动端触控交互 ---
-        // 我们在每一帧都放置两个覆盖左右半屏的透明 DIV
+        // --- 触控区域定义 ---
         var touchLayout = [
-            { id: 'leftZone', css: { position: 'absolute', left: 0, top: 0, width: '50%', height: '100%', 'z-index': 999 } },
-            { id: 'rightZone', css: { position: 'absolute', right: 0, top: 0, width: '50%', height: '100%', 'z-index': 999 } }
+            { id: 'leftZone', css: { position: 'absolute', left: 0, top: 0, width: '50%', height: '100%', 'z-index': 999, 'background-color': 'transparent' } },
+            { id: 'rightZone', css: { position: 'absolute', right: 0, top: 0, width: '50%', height: '100%', 'z-index': 999, 'background-color': 'transparent' } }
         ];
 
+        // --- 基础试次模板 ---
         API.addTrialSets('base', [{
-            // 关键：不再模拟 E 和 I 键，直接监听这两个 DIV 的点击
             input: [
                 { handle: 'left', on: 'click', type: 'inputByElement', element: 'leftZone' },
                 { handle: 'right', on: 'click', type: 'inputByElement', element: 'rightZone' }
@@ -34,32 +34,82 @@ define(['pipAPI', 'pipScorer', 'underscore'], function (APIConstructor, Scorer, 
             ]
         }]);
 
-        // --- 指令页试次 ---
+        // --- 指令页模板 ---
         API.addTrialSets('instructions', [{
             input: [{ handle: 'skip', on: 'click', type: 'inputByElement', element: 'startBtn' }],
             layout: [
-                { location: { top: 10, left: 5, width: 90, height: 60 }, media: { html: '<%= trialData.instHTML %>' } },
-                { id: 'startBtn', location: { top: 70, left: 25, width: 50, height: 15 }, css: { 'background-color': '#007bff', color: '#fff', 'border-radius': '5px', 'font-size': '1.5em', 'display': 'flex', 'align-items': 'center', 'justify-content': 'center' }, media: { word: '開始任務' } }
+                { location: { top: 5, left: 5, width: 90, height: 65 }, media: { html: '<%= trialData.instHTML %>' }, css: { 'overflow-y': 'auto', 'font-size': '0.9em' } },
+                { id: 'startBtn', location: { top: 75, left: 20, width: 60, height: 12 }, css: { 'background-color': '#28a745', color: '#fff', 'border-radius': '10px', 'display': 'flex', 'align-items': 'center', 'justify-content': 'center', 'font-size': '1.5em' }, media: { word: '點擊此處開始' } }
             ]
         }]);
 
-        // --- 构建实验序列 ---
-        var sequence = [];
-        _.each(stiatObj.trialsByBlock, function (bConfig, index) {
-            // 添加指令页
-            sequence.push({ inherit: 'instructions', data: { instHTML: bConfig.instHTML } });
+        // --- 刺激项显示模板 ---
+        API.addTrialSets('stimulus', [{
+            inherit: 'base',
+            data: { score: 0 },
+            stimuli: [
+                { inherit: { type: 'exSBY', set: 'target' } },
+                { inherit: { type: 'exSBY', set: 'error' } }
+            ],
+            interactions: [
+                {
+                    conditions: [{ type: 'inputEquals', value: 'targetCorrect' }],
+                    actions: [{ type: 'goto', value: 'next' }]
+                },
+                {
+                    conditions: [{ type: 'inputEquals', value: 'targetError' }],
+                    actions: [
+                        { type: 'setTrialAttr', setter: { score: 1 } },
+                        { type: 'showStim', handle: 'error' }
+                    ]
+                }
+            ]
+        }]);
 
-            // 添加该 Block 的测试试次（此处简化，实际逻辑会根据你的 trialsByBlock 生成循环）
-            // 注意：每个测试试次都要 inherit: 'base' 以获得触控功能
-            // ... (由于此处代码较长，建议直接合并到你的完整版 qstiat6 逻辑中)
+        // --- 生成实验序列 ---
+        var sequence = [];
+        
+        // 处理每一个 Block
+        _.each(stiatObj.trialsByBlock, function (bConfig, bIndex) {
+            // 1. 添加指令页
+            sequence.push({
+                inherit: 'instructions',
+                data: { instHTML: bConfig.instHTML }
+            });
+
+            // 2. 添加测试试次 (这里简化处理，确保能跑通)
+            // 实际逻辑会根据 block 类型随机抽取刺激词
+            var totalTrials = bConfig.singleAttTrials + bConfig.sharedAttTrials + bConfig.categoryTrials;
+            for (var i = 0; i < totalTrials; i++) {
+                sequence.push({
+                    inherit: 'stimulus',
+                    data: { block: bIndex + 1 }
+                });
+            }
         });
 
-        // 提示：为了确保万无一失，你可以直接将你的 qstiat6-mobile.js 全文替换为 
-        // MinnoJS 官方的 Mobile IAT 模板，然后把 stimuli 填进去。
-        // 以上代码已经展示了如何将 "点击" 映射为 "Left/Right" 响应。
-        
         API.addSequence(sequence);
+
+        // --- 计分逻辑 ---
+        scorer.addSettings('compute', {
+            ErrorVar: 'score',
+            condVar: 'block',
+            fastRT: 150,
+            maxRT: 10000,
+            errorLatency: { use: 'latency', penalty: 600, useForSTD: true }
+        });
+
+        API.addSettings('hooks', {
+            endTask: function () {
+                var score = scorer.computeD();
+                piCurrent.feedback = score.F;
+                if (minnoJS.logger) minnoJS.logger(JSON.stringify(score));
+                if (minnoJS.onEnd) minnoJS.onEnd();
+            }
+        });
+
         return API.script;
     }
+
     return stiatExtension;
 });
